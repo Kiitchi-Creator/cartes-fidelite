@@ -11,6 +11,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="icon" href="Designer.png">
     <link rel="apple-touch-icon" href="Designer.png">
+    <link rel="manifest" href="manifest.json">
     
     <!-- Tailwind CSS & Libraries via CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -169,6 +170,13 @@
 
     <!-- JavaScript Logique -->
     <script>
+        // Enregistrement du Service Worker pour la PWA
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js').catch(err => console.log('SW error:', err));
+            });
+        }
+
         // Cartes d'exemple initiales
         const defaultCards = [
             { id: '1', store: 'Lidl', holder: 'Maman', number: '2800000123456' },

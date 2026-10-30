@@ -1,2 +1,16 @@
-// Service Worker minimal pour validation PWA
-self.addEventListener('fetch', (e) => {});
+// Service Worker avec gestion du cache
+const CACHE_NAME = 'cartes-fidelite-v1';
+
+self.addEventListener('install', (e) => {
+  self.skipWaiting();
+});
+
+self.addEventListener('activate', (e) => {
+  e.waitUntil(clients.claim());
+});
+
+self.addEventListener('fetch', (e) => {
+  e.respondWith(
+    fetch(e.request).catch(() => caches.match(e.request))
+  );
+});
