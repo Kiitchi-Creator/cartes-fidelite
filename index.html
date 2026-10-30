@@ -55,37 +55,36 @@
                 </div>
             </div>
             
-            <button onclick="openAddModal()" class="bg-gradient-to-r from-cyan-500 to-purple-600 hover:from-cyan-400 hover:to-purple-500 text-white font-bold px-3 py-2 rounded-xl text-sm flex items-center gap-1 shadow-lg shadow-cyan-500/20 active:scale-95 transition">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
-                Ajouter
-            </button>
+            <div class="flex items-center gap-2">
+                <!-- Bouton d'installation direct ultra visible -->
+                <button onclick="forceInstallApp()" class="bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-400 hover:to-purple-500 text-white font-bold px-3 py-2 rounded-xl text-xs flex items-center gap-1 shadow-lg shadow-pink-500/20 active:scale-95 transition" title="Installer l'app sur l'écran d'accueil">
+                    📲 Installer
+                </button>
+                <button onclick="openAddModal()" class="bg-gradient-to-r from-cyan-500 to-purple-600 hover:from-cyan-400 hover:to-purple-500 text-white font-bold px-3 py-2 rounded-xl text-sm flex items-center gap-1 shadow-lg shadow-cyan-500/20 active:scale-95 transition">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+                    Ajouter
+                </button>
+            </div>
         </div>
     </header>
 
-    <!-- Bannière d'installation PWA si disponible -->
-    <div id="pwaInstallBanner" class="hidden max-w-md mx-auto m-4 p-3 bg-gradient-to-r from-purple-900/80 to-pink-900/80 border border-pink-500/30 rounded-2xl flex items-center justify-between text-sm">
-        <div class="flex items-center gap-2">
-            <span class="text-xl">📲</span>
-            <span class="font-medium text-pink-100">Installer sur le téléphone</span>
-        </div>
-        <button onclick="triggerPwaInstall()" class="bg-pink-500 hover:bg-pink-400 text-white font-bold px-3 py-1.5 rounded-xl text-xs shadow">
-            Installer
-        </button>
-    </div>
-
-    <!-- Aide contextuelle si l'installation auto bloque -->
-    <div class="max-w-md mx-auto px-4 mb-2">
-        <details class="bg-slate-900/50 border border-slate-800 rounded-xl p-3 text-xs text-slate-400">
-            <summary class="cursor-pointer font-medium text-cyan-400 flex items-center justify-between">
-                <span>💡 Comment l'ajouter sur l'écran d'accueil ?</span>
-                <span>▼</span>
-            </summary>
-            <div class="mt-2 space-y-1 text-slate-300">
-                <p>1. Appuyez sur les <strong>3 petits points</strong> en haut à droite de Chrome.</p>
-                <p>2. Choisissez <strong>« Ajouter à l'écran d'accueil »</strong> ou <strong>« Installer l'application »</strong>.</p>
-                <p class="text-slate-500 italic mt-1">L'icône avec le robot apparaîtra directement sur le bureau du téléphone !</p>
+    <!-- Modale d'aide guidée si l'installation automatique est bloquée -->
+    <div id="installModal" class="fixed inset-0 bg-black/80 z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-sm p-6 relative text-center">
+            <div class="text-4xl mb-3">📲</div>
+            <h3 class="text-lg font-bold text-white mb-2">Installer l'application</h3>
+            <p class="text-xs text-slate-300 mb-4">
+                Pour ajouter l'icône sur l'écran d'accueil du téléphone de votre maman en un clin d'œil :
+            </p>
+            <div class="bg-slate-800 p-4 rounded-2xl text-left text-xs space-y-2 text-slate-200 mb-4">
+                <p>1. Appuyez sur les <strong>3 petits points</strong> <b>(⋮)</b> en haut à droite de Chrome.</p>
+                <p>2. Sélectionnez <strong>« Ajouter à l'écran d'accueil »</strong> ou <strong>« Installer l'application »</strong>.</p>
+                <p>3. Confirmez ! L'icône avec le robot apparaîtra directement sur le bureau.</p>
             </div>
-        </details>
+            <button onclick="closeInstallModal()" class="w-full bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold py-2.5 rounded-xl text-sm">
+                J'ai compris
+            </button>
+        </div>
     </div>
 
     <!-- Zone principale : Liste des cartes -->
@@ -279,7 +278,6 @@
                         displayValue: false
                     });
                 } catch (e) {
-                    // Repli universel si EAN13 échoue
                     try {
                         JsBarcode("#barcodeCanvas", card.number, {
                             format: "CODE128",
@@ -381,23 +379,30 @@
             }
         }
 
-        // PWA Install prompt
+        // PWA Install prompt & Forçage manuel
         let deferredPrompt;
         window.addEventListener('beforeinstallprompt', (e) => {
             e.preventDefault();
             deferredPrompt = e;
-            const banner = document.getElementById('pwaInstallBanner');
-            if (banner) banner.classList.remove('hidden');
         });
 
-        function triggerPwaInstall() {
+        function forceInstallApp() {
             if (deferredPrompt) {
                 deferredPrompt.prompt();
-                deferredPrompt.userChoice.then(() => {
+                deferredPrompt.userChoice.then((choiceResult) => {
+                    if (choiceResult.outcome === 'accepted') {
+                        console.log('Utilisateur a accepté l\'installation');
+                    }
                     deferredPrompt = null;
-                    document.getElementById('pwaInstallBanner').classList.add('hidden');
                 });
+            } else {
+                // Affiche la modale explicative claire si le navigateur bloque l'automatisme
+                document.getElementById('installModal').classList.remove('hidden');
             }
+        }
+
+        function closeInstallModal() {
+            document.getElementById('installModal').classList.add('hidden');
         }
     </script>
 </body>
