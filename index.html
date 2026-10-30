@@ -9,29 +9,373 @@
     <meta name="theme-color" content="#0b0f19">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <link rel="icon" id="appFavicon" href="Designer.png">
+    <link rel="icon" href="Designer.png">
     <link rel="apple-touch-icon" href="Designer.png">
     
-    <!-- Manifest Inline complet avec scope unique pour GitHub Pages -->
-    <link rel="manifest" href='data:application/manifest+json,{"name":"Mes Cartes Fidélité","short_name":"Mes Cartes","description":"Mes cartes de fidélité hors ligne","start_url":"/cartes-fidelite/","scope":"/cartes-fidelite/","display":"standalone","background_color":"#0b0f19","theme_color":"#0b0f19","icons":[{"src":"Designer.png","sizes":"512x512","type":"image/png","purpose":"any maskable"}]}'>
+    <!-- Tailwind CSS & Libraries via CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
+    <script src="https://unpkg.com/html5-qrcode"></script>
 
-    <!-- Script d'installation PWA et Service Worker -->
+    <style>
+        body {
+            background-color: #0b0f19;
+            color: #f3f4f6;
+            font-family: system-ui, -apple-system, sans-serif;
+            touch-action: manipulation;
+        }
+        .neon-card {
+            background: linear-gradient(135deg, rgba(30, 41, 59, 0.7) 0%, rgba(15, 23, 42, 0.8) 100%);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.5);
+        }
+        .neon-border {
+            border: 2px solid transparent;
+            background-image: linear-gradient(#0b0f19, #0b0f19), linear-gradient(135deg, #06b6d4, #a855f7, #ec4899);
+            background-origin: border-box;
+            background-clip: padding-box, border-box;
+        }
+    </style>
+</head>
+<body class="min-h-screen pb-20">
+
+    <!-- En-tête / Header -->
+    <header class="p-4 bg-slate-900/80 backdrop-blur sticky top-0 z-30 border-b border-slate-800">
+        <div class="max-w-md mx-auto flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="w-12 h-12 rounded-xl neon-border overflow-hidden flex-shrink-0 bg-slate-800">
+                    <img src="Designer.png" alt="Avatar" class="w-full h-full object-cover" onerror="this.src='https://placehold.co/100/1e293b/06b6d4?text=Robot'">
+                </div>
+                <div>
+                    <h1 class="font-bold text-lg text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-pink-500">
+                        Mes Cartes
+                    </h1>
+                    <p class="text-xs text-slate-400">Application facile & hors-ligne</p>
+                </div>
+            </div>
+            
+            <button onclick="openAddModal()" class="bg-gradient-to-r from-cyan-500 to-purple-600 hover:from-cyan-400 hover:to-purple-500 text-white font-bold px-3 py-2 rounded-xl text-sm flex items-center gap-1 shadow-lg shadow-cyan-500/20 active:scale-95 transition">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+                Ajouter
+            </button>
+        </div>
+    </header>
+
+    <!-- Bannière d'installation PWA si disponible -->
+    <div id="pwaInstallBanner" class="hidden max-w-md mx-auto m-4 p-3 bg-gradient-to-r from-purple-900/80 to-pink-900/80 border border-pink-500/30 rounded-2xl flex items-center justify-between text-sm">
+        <div class="flex items-center gap-2">
+            <span class="text-xl">📲</span>
+            <span class="font-medium text-pink-100">Installer sur le téléphone</span>
+        </div>
+        <button onclick="triggerPwaInstall()" class="bg-pink-500 hover:bg-pink-400 text-white font-bold px-3 py-1.5 rounded-xl text-xs shadow">
+            Installer
+        </button>
+    </div>
+
+    <!-- Zone principale : Liste des cartes -->
+    <main class="max-w-md mx-auto p-4">
+        <!-- Recherche rapide -->
+        <div class="mb-4 relative">
+            <input type="text" id="searchInput" oninput="filterCards()" placeholder="🔍 Rechercher un magasin..." 
+                class="w-full bg-slate-800/80 border border-slate-700 text-white rounded-xl px-4 py-3 pl-10 text-sm focus:outline-none focus:border-cyan-400 transition">
+            <svg class="w-5 h-5 text-slate-400 absolute left-3 top-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+        </div>
+
+        <!-- Cartes affichées -->
+        <div id="cardsList" class="grid gap-4">
+            <!-- Injecté par JavaScript -->
+        </div>
+
+        <!-- Message si aucune carte -->
+        <div id="emptyState" class="hidden text-center py-12 text-slate-400">
+            <div class="text-5xl mb-3">💳</div>
+            <p class="font-medium text-slate-300">Aucune carte enregistrée</p>
+            <p class="text-xs text-slate-500 mt-1">Cliquez sur "+ Ajouter" pour en enregistrer une !</p>
+        </div>
+    </main>
+
+    <!-- MODAL 1 : Affichage Plein Écran (Passage en caisse) -->
+    <div id="scanModal" class="fixed inset-0 bg-black/90 z-50 hidden flex flex-col justify-between p-4 backdrop-blur-sm">
+        <div class="flex justify-between items-center text-white">
+            <button onclick="closeScanModal()" class="p-2 bg-slate-800 rounded-full text-slate-300">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </button>
+            <h2 id="modalStoreName" class="font-bold text-xl text-center text-cyan-400">Enseigne</h2>
+            <div class="w-10"></div>
+        </div>
+
+        <!-- Zone Blanche Éclatante Spécial Douchette -->
+        <div class="bg-white rounded-3xl p-6 text-center my-auto shadow-2xl flex flex-col items-center justify-center min-h-[300px]">
+            <p id="modalCardHolder" class="text-slate-600 font-semibold mb-2 text-sm"></p>
+            
+            <div class="w-full flex justify-center items-center my-4 overflow-hidden">
+                <svg id="barcodeCanvas" class="max-w-full"></svg>
+            </div>
+
+            <p id="modalCardNumber" class="text-slate-900 font-mono text-2xl font-bold tracking-widest mt-2 bg-slate-100 px-4 py-2 rounded-xl">
+                0000 0000 0000
+            </p>
+        </div>
+
+        <div class="text-center text-slate-400 text-xs py-2">
+            💡 Présentez cet écran au caissier ou à la borne.
+        </div>
+    </div>
+
+    <!-- MODAL 2 : Ajouter / Éditer une Carte -->
+    <div id="addModal" class="fixed inset-0 bg-black/80 z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-md p-6 relative max-h-[90vh] overflow-y-auto">
+            <h2 class="text-xl font-bold text-white mb-4" id="addModalTitle">Ajouter une carte</h2>
+            
+            <form onsubmit="saveCard(event)" class="space-y-4">
+                <input type="hidden" id="cardId">
+                
+                <div>
+                    <label class="block text-xs font-semibold text-slate-400 mb-1">Nom du magasin / Enseigne</label>
+                    <input type="text" id="inputStore" required placeholder="Ex: Lidl, Leclerc, Auchan..." 
+                        class="w-full bg-slate-800 border border-slate-700 text-white rounded-xl p-3 text-sm focus:outline-none focus:border-cyan-400">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-400 mb-1">Nom du titulaire (facultatif)</label>
+                    <input type="text" id="inputHolder" placeholder="Ex: Maman, Papa..." 
+                        class="w-full bg-slate-800 border border-slate-700 text-white rounded-xl p-3 text-sm focus:outline-none focus:border-cyan-400">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-400 mb-1">Numéro de carte / Code-barres</label>
+                    <div class="flex gap-2">
+                        <input type="text" id="inputNumber" required placeholder="Tapez le numéro..." 
+                            class="w-full bg-slate-800 border border-slate-700 text-white rounded-xl p-3 text-sm focus:outline-none focus:border-cyan-400">
+                        <button type="button" onclick="startScanner()" class="bg-slate-800 border border-slate-700 hover:bg-slate-700 text-cyan-400 p-3 rounded-xl flex-shrink-0 flex items-center justify-center" title="Scanner avec l'appareil photo">
+                            📷
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Zone de scan caméra -->
+                <div id="scannerContainer" class="hidden bg-black rounded-xl overflow-hidden p-2 relative">
+                    <div id="reader" class="w-full"></div>
+                    <button type="button" onclick="stopScanner()" class="mt-2 w-full bg-red-600/80 text-white text-xs font-bold py-2 rounded-lg">Fermer la caméra</button>
+                </div>
+
+                <div class="flex justify-end gap-3 pt-4 border-t border-slate-800">
+                    <button type="button" onclick="closeAddModal()" class="px-4 py-2.5 rounded-xl bg-slate-800 text-slate-300 text-sm font-semibold">Annuler</button>
+                    <button type="submit" class="px-5 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-purple-600 text-white text-sm font-bold shadow-lg shadow-cyan-500/20">Enregistrer</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- JavaScript Logique -->
     <script>
-      let deferredPrompt;
-      window.addEventListener('beforeinstallprompt', (e) => {
-        e.preventDefault();
-        deferredPrompt = e;
-        const installBtn = document.getElementById('pwaInstallBanner');
-        if (installBtn) installBtn.classList.remove('hidden');
-      });
+        // Cartes d'exemple initiales
+        const defaultCards = [
+            { id: '1', store: 'Lidl', holder: 'Maman', number: '2800000123456' },
+            { id: '2', store: 'E.Leclerc', holder: 'Maman', number: '0412345678901' },
+            { id: '3', store: 'Auchan', holder: 'Maman', number: '012345678912' }
+        ];
 
-      if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-          navigator.serviceWorker.register('./sw.js', { scope: '/cartes-fidelite/' }).catch(() => {
-            // Fallback si pas de fichier sw.js séparé
-          });
+        let cards = [];
+        let html5QrCode = null;
+
+        // Chargement au démarrage
+        window.addEventListener('DOMContentLoaded', () => {
+            const saved = localStorage.getItem('my_fidelity_cards');
+            if (saved) {
+                try { cards = JSON.parse(saved); } catch(e) { cards = defaultCards; }
+            } else {
+                cards = defaultCards;
+                saveToLocalStorage();
+            }
+            renderCards();
         });
-      }
 
-      function triggerPwaInstall() {
-<!-- ... existing code -->
+        function saveToLocalStorage() {
+            localStorage.setItem('my_fidelity_cards', JSON.stringify(cards));
+        }
+
+        function renderCards(list = cards) {
+            const container = document.getElementById('cardsList');
+            const emptyState = document.getElementById('emptyState');
+            container.innerHTML = '';
+
+            if (list.length === 0) {
+                emptyState.classList.remove('hidden');
+                return;
+            }
+            emptyState.classList.add('hidden');
+
+            list.forEach(card => {
+                const cardEl = document.createElement('div');
+                cardEl.className = 'neon-card rounded-2xl p-4 flex justify-between items-center cursor-pointer hover:border-cyan-500/50 transition active:scale-[0.99]';
+                cardEl.onclick = () => openScanModal(card);
+
+                cardEl.innerHTML = `
+                    <div class="flex items-center gap-3">
+                        <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-cyan-500/20 to-purple-500/20 border border-cyan-500/30 flex items-center justify-center text-xl font-bold text-cyan-400">
+                            ${card.store.charAt(0).toUpperCase()}
+                        </div>
+                        <div>
+                            <h3 class="font-bold text-white text-base">${card.store}</h3>
+                            <p class="text-xs text-slate-400">${card.holder ? card.holder : 'Carte de fidélité'}</p>
+                            <p class="text-xs font-mono text-cyan-400/80 mt-1">${card.number}</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-1">
+                        <button onclick="event.stopPropagation(); editCard('${card.id}')" class="p-2 text-slate-400 hover:text-white rounded-lg">✏️</button>
+                        <button onclick="event.stopPropagation(); deleteCard('${card.id}')" class="p-2 text-slate-400 hover:text-red-400 rounded-lg">🗑️</button>
+                    </div>
+                `;
+                container.appendChild(cardEl);
+            });
+        }
+
+        function filterCards() {
+            const query = document.getElementById('searchInput').value.toLowerCase();
+            const filtered = cards.filter(c => c.store.toLowerCase().includes(query) || c.number.includes(query));
+            renderCards(filtered);
+        }
+
+        function openScanModal(card) {
+            document.getElementById('modalStoreName').innerText = card.store;
+            document.getElementById('modalCardHolder').innerText = card.holder ? `Titulaire : ${card.holder}` : '';
+            document.getElementById('modalCardNumber').innerText = card.number;
+
+            const modal = document.getElementById('scanModal');
+            modal.classList.remove('hidden');
+
+            // Génération dynamique du Code-Barres avec sécurité
+            setTimeout(() => {
+                try {
+                    JsBarcode("#barcodeCanvas", card.number, {
+                        format: "EAN13",
+                        flat: true,
+                        width: 2.5,
+                        height: 90,
+                        displayValue: false
+                    });
+                } catch (e) {
+                    // Repli universel si EAN13 échoue
+                    try {
+                        JsBarcode("#barcodeCanvas", card.number, {
+                            format: "CODE128",
+                            width: 2,
+                            height: 90,
+                            displayValue: false
+                        });
+                    } catch(err) {
+                        console.error("Impossible de générer le code-barres", err);
+                    }
+                }
+            }, 50);
+        }
+
+        function closeScanModal() {
+            document.getElementById('scanModal').classList.add('hidden');
+        }
+
+        function openAddModal() {
+            document.getElementById('addModalTitle').innerText = "Ajouter une carte";
+            document.getElementById('cardId').value = "";
+            document.getElementById('inputStore').value = "";
+            document.getElementById('inputHolder').value = "Maman";
+            document.getElementById('inputNumber').value = "";
+            document.getElementById('addModal').classList.remove('hidden');
+        }
+
+        function closeAddModal() {
+            stopScanner();
+            document.getElementById('addModal').classList.add('hidden');
+        }
+
+        function saveCard(e) {
+            e.preventDefault();
+            const id = document.getElementById('cardId').value || Date.now().toString();
+            const store = document.getElementById('inputStore').value.trim();
+            const holder = document.getElementById('inputHolder').value.trim();
+            const number = document.getElementById('inputNumber').value.trim();
+
+            const existingIndex = cards.findIndex(c => c.id === id);
+            if (existingIndex >= 0) {
+                cards[existingIndex] = { id, store, holder, number };
+            } else {
+                cards.push({ id, store, holder, number });
+            }
+
+            saveToLocalStorage();
+            renderCards();
+            closeAddModal();
+        }
+
+        function editCard(id) {
+            const card = cards.find(c => c.id === id);
+            if (!card) return;
+            document.getElementById('addModalTitle').innerText = "Modifier la carte";
+            document.getElementById('cardId').value = card.id;
+            document.getElementById('inputStore').value = card.store;
+            document.getElementById('inputHolder').value = card.holder || "";
+            document.getElementById('inputNumber').value = card.number;
+            document.getElementById('addModal').classList.remove('hidden');
+        }
+
+        function deleteCard(id) {
+            if (confirm("Voulez-vous supprimer cette carte ?")) {
+                cards = cards.filter(c => c.id !== id);
+                saveToLocalStorage();
+                renderCards();
+            }
+        }
+
+        // Scanner QR / Code Barres
+        function startScanner() {
+            document.getElementById('scannerContainer').classList.remove('hidden');
+            html5QrCode = new Html5Qrcode("reader");
+            html5QrCode.start(
+                { facingMode: "environment" },
+                { fps: 10, qrbox: { width: 250, height: 150 } },
+                (decodedText) => {
+                    document.getElementById('inputNumber').value = decodedText;
+                    stopScanner();
+                },
+                (errorMessage) => {}
+            ).catch(err => {
+                alert("Impossible d'accéder à la caméra.");
+                stopScanner();
+            });
+        }
+
+        function stopScanner() {
+            if (html5QrCode) {
+                html5QrCode.stop().then(() => {
+                    html5QrCode = null;
+                    document.getElementById('scannerContainer').classList.add('hidden');
+                }).catch(() => {
+                    document.getElementById('scannerContainer').classList.add('hidden');
+                });
+            } else {
+                document.getElementById('scannerContainer').classList.add('hidden');
+            }
+        }
+
+        // PWA Install prompt
+        let deferredPrompt;
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+            const banner = document.getElementById('pwaInstallBanner');
+            if (banner) banner.classList.remove('hidden');
+        });
+
+        function triggerPwaInstall() {
+            if (deferredPrompt) {
+                deferredPrompt.prompt();
+                deferredPrompt.userChoice.then(() => {
+                    deferredPrompt = null;
+                    document.getElementById('pwaInstallBanner').classList.add('hidden');
+                });
+            }
+        }
+    </script>
+</body>
+</html>
