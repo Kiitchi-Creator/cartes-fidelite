@@ -11,7 +11,41 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="icon" id="appFavicon" href="Designer.png">
     <link rel="apple-touch-icon" href="Designer.png">
-    <link rel="manifest" href='data:application/manifest+json,{"name":"Mes Cartes","short_name":"Mes Cartes","start_url":".","display":"standalone","background_color":"#0b0f19","theme_color":"#0b0f19","icons":[{"src":"Designer.png","sizes":"512x512","type":"image/png"}]}'>
+    
+    <!-- Manifest Inline complet -->
+    <link rel="manifest" href='data:application/manifest+json,{"name":"Mes Cartes Fidélité","short_name":"Mes Cartes","description":"Mes cartes de fidélité hors ligne","start_url":"./","scope":"./","display":"standalone","background_color":"#0b0f19","theme_color":"#0b0f19","icons":[{"src":"Designer.png","sizes":"512x512","type":"image/png","purpose":"any maskable"}]}'>
+
+    <!-- Script d'installation PWA et Service Worker -->
+    <script>
+      let deferredPrompt;
+      window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        deferredPrompt = e;
+        const installBtn = document.getElementById('pwaInstallBanner');
+        if (installBtn) installBtn.classList.remove('hidden');
+      });
+
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('./sw.js', { scope: './' }).catch(() => {
+            // Fallback si pas de fichier sw.js séparé
+          });
+        });
+      }
+
+      function triggerPwaInstall() {
+        if (deferredPrompt) {
+          deferredPrompt.prompt();
+          deferredPrompt.userChoice.then((choiceResult) => {
+            if (choiceResult.outcome === 'accepted') {
+              console.log('App installée !');
+            }
+            deferredPrompt = null;
+            document.getElementById('pwaInstallBanner').classList.add('hidden');
+          });
+        }
+      }
+    </script>
 
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -96,6 +130,22 @@
             </button>
         </div>
     </header>
+
+    <!-- Bannière spéciale d'installation PWA (détectée automatiquement par Chrome) -->
+    <section id="pwaInstallBanner" class="max-w-md mx-auto w-full px-4 pt-3 hidden">
+        <div class="bg-gradient-to-r from-cyan-950 via-slate-900 to-fuchsia-950 border-2 border-cyan-400/50 rounded-2xl p-3.5 flex items-center justify-between shadow-lg">
+            <div class="flex items-center gap-3">
+                <i data-lucide="download-cloud" class="w-7 h-7 text-cyan-400 animate-bounce"></i>
+                <div>
+                    <p class="text-sm font-bold text-white">Installer sur le téléphone</p>
+                    <p class="text-xs text-slate-300">Ajouter l'icône sur l'écran d'accueil</p>
+                </div>
+            </div>
+            <button onclick="triggerPwaInstall()" class="px-4 py-2 bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-extrabold text-sm rounded-xl btn-touch shadow-md">
+                Installer
+            </button>
+        </div>
+    </section>
 
     <!-- Barre de recherche -->
     <section class="max-w-md mx-auto w-full px-4 pt-4 pb-2">
